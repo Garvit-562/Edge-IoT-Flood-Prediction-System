@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge AI Flood Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+        :root {
+            --bg-color: #0b1120;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --glow-low: 0 0 20px rgba(16, 185, 129, 0.4);
+            --color-low: #10b981;
+            --glow-high: 0 0 20px rgba(245, 158, 11, 0.4);
+            --color-high: #f59e0b;
+            --glow-alarm: 0 0 25px rgba(239, 68, 68, 0.6);
+            --color-alarm: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0b1120 70%);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        header h1 {
+            font-weight: 800;
+            font-size: 28px;
+            margin: 0;
+            background: -webkit-linear-gradient(#38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        #result-panel {
+            text-align: center;
+            border-width: 2px;
+        }
+
+        #risk-status {
+            font-size: 30px;
+            font-weight: 800;
+            margin: 10px 0;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        #latency-chip {
+            display: inline-block;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--text-muted);
+            border: 1px solid var(--glass-border);
+        }
+
+        .controls-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .control-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        .control-value {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--accent);
+            background: rgba(56, 189, 248, 0.1);
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -7px;
+            transition: transform 0.1s;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-weight: bold;
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+</head>
+
+<body>
+
+    <div id="loading-overlay">
+        <div class="spinner" id="spinner"></div>
+        <div id="loading-text">Initializing Edge AI Engine...</div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>CATBOOST AI NODE</h1>
+            <p>Live Edge Inferencing</p>
+        </header>
+
+        <div class="card" id="result-panel">
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;">CURRENT RISK ASSESSMENT</div>
+            <div id="risk-status">ANALYZING...</div>
+            <div id="latency-chip">⏱️ Compute: -- ms</div>
+        </div>
+
+        <div class="card">
+            <div class="controls-grid">
+
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Monsoon Intensity</span><span
+                            class="control-value" id="val-monsoon">6</span></div><input type="range" id="sl-monsoon"
+                        min="1" max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Drainage Systems</span><span
+                            class="control-value" id="val-drain">6</span></div><input type="range" id="sl-drain" min="1"
+                        max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">River Management</span><span
+                            class="control-value" id="val-river">6</span></div><input type="range" id="sl-river" min="1"
+                        max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Siltation (Turbidity)</span><span
+                            class="control-value" id="val-silt">6</span></div><input type="range" id="sl-silt" min="1"
+                        max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Soil Moisture</span><span
+                            class="control-value" id="val-soil">6</span></div><input type="range" id="sl-soil" min="1"
+                        max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Ground Stability</span><span
+                            class="control-value" id="val-ground">6</span></div><input type="range" id="sl-ground"
+                        min="1" max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Dam Pressure</span><span
+                            class="control-value" id="val-dam">6</span></div><input type="range" id="sl-dam" min="1"
+                        max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Surface Runoff</span><span
+                            class="control-value" id="val-runoff">6</span></div><input type="range" id="sl-runoff"
+                        min="1" max="12" value="6" oninput="runCatBoost()">
+                </div>
+                <div class="control-item">
+                    <div class="control-header"><span class="control-label">Tide / Surge Level</span><span
+                            class="control-value" id="val-tide">6</span></div><input type="range" id="sl-tide" min="1"
+                        max="12" value="6" oninput="runCatBoost()">
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tell ONNX where to find the WebAssembly backend
+        ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+
+        // FIX 1: Disable multi-threading (Prevents edge-browser crashes)
+        ort.env.wasm.numThreads = 1;
+
+        let session = null;
+        let cloudLatencyGlobal = "--";
+        let edgeLatencyGlobal = "--";
+
+        // Load the ONNX model once when the page opens
+        window.addEventListener('load', async function () {
+            try {
+                session = await ort.InferenceSession.create('./model.onnx');
+                document.getElementById('loading-overlay').style.display = 'none';
+                runCatBoost();
+            } catch (e) {
+                console.error("Model load error:", e);
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('loading-text').innerHTML = "⚠️ ERROR LOADING MODEL.<br>Ensure you ran 'python -m http.server 8000' and 'model.onnx' is in the folder.";
+                document.getElementById('loading-text').style.color = "#ef4444";
+            }
+        });
+
+        async function runCatBoost() {
+            if (!session) return;
+
+            let ids = ['monsoon', 'drain', 'river', 'silt', 'soil', 'ground', 'dam', 'runoff', 'tide'];
+            let vals = {};
+
+            ids.forEach(id => {
+                let v = parseInt(document.getElementById('sl-' + id).value);
+                document.getElementById('val-' + id).innerText = v;
+                vals[id] = v;
+            });
+
+            // Map exactly to the 20-feature input array (Float32 required by ONNX)
+            let inputMatrix = Float32Array.from([
+                vals.monsoon, vals.runoff, vals.river, 5.0, 5.0, 5.0, vals.dam, vals.silt, 5.0, 5.0, 5.0, vals.drain, vals.tide, vals.ground, vals.soil, 5.0, 5.0, 5.0, 5.0, 5.0
+            ]);
+
+            // Send data to cloud
+
+
+            try {
+                let feeds = {};
+
+                // FIX 2: Dynamically handle if CatBoost exported as 1 matrix OR 20 separate columns
+                if (session.inputNames.length === 1) {
+                    feeds[session.inputNames[0]] = new ort.Tensor('float32', inputMatrix, [1, 20]);
+                } else {
+                    for (let i = 0; i < session.inputNames.length; i++) {
+                        feeds[session.inputNames[i]] = new ort.Tensor('float32', Float32Array.from([inputMatrix[i]]), [1, 1]);
+                    }
+                }
+
+                // Run Inference and measure EXACT microsecond timing
+                let start = performance.now();
+                // We pass an array of the specific outputs we want, forcing it to ignore the broken probability dictionary
+                let results = await session.run(feeds, [session.outputNames[0]]);
+                let end = performance.now();
+                let edgeLatency = (end - start).toFixed(2);
+
+                edgeLatencyGlobal = edgeLatency;
+
+                // Extract predicted class
+                let outLabel = results[session.outputNames[0]].data[0];
+
+                // Map the output
+                let finalRisk = "Low";
+                if (outLabel === 0n || outLabel === 0 || outLabel === "Alarming") finalRisk = "Alarming";
+                else if (outLabel === 1n || outLabel === 1 || outLabel === "High") finalRisk = "High";
+
+                updateNeonUI(finalRisk, edgeLatency);
+
+                let cloudStart = performance.now();
+
+                // CHANGE URL IF NEEDED - this is the endpoint of our Flask server running the cloud model
+                // http://10.77.244.60:5000
+                // http://10.245.125.60:5000
+                fetch("http://10.245.125.60:5000/predict", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        features: Array.from(inputMatrix),
+                        edge_latency: edgeLatencyGlobal
+                    })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        let cloudEnd = performance.now();
+
+                        let totalCloudLatency = (cloudEnd - cloudStart).toFixed(2);
+
+                        console.log("Cloud:", data);
+
+                        // cloudLatencyGlobal = data.cloud_latency;
+                        cloudLatencyGlobal = totalCloudLatency;
+                        // ✅ SECOND FETCH → send correct latency to backend
+                        // CHANGE URL IF NEEDED - this is the endpoint of our Flask server for logging latency and predictions
+                        // http://10.77.244.60:5000
+                        // http://10.245.125.60:5000
+                        fetch("http://10.245.125.60:5000/log_latency", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                edge_latency: edgeLatencyGlobal,
+                                cloud_latency: totalCloudLatency,
+                                prediction: finalRisk
+                            })
+                        });
+                        updateNeonUI(finalRisk, edgeLatency);
+                    })
+                    .catch(err => {
+                        console.log("Cloud error:", err);
+                    });
+
+            } catch (err) {
+                console.error("Inference Error:", err);
+
+                // FIX 3: Print the exact system error to the phone screen!
+                let status = document.getElementById('risk-status');
+                status.innerText = "ERROR";
+                status.style.color = "#ef4444";
+                status.style.fontSize = "24px";
+
+                // This will show us EXACTLY what ONNX is complaining about
+                document.getElementById('latency-chip').innerText = err.message.substring(0, 60) + "...";
+            }
+        }
+
+        function updateNeonUI(risk, latency) {
+            let panel = document.getElementById('result-panel');
+            let status = document.getElementById('risk-status');
+
+            status.innerText = risk + " RISK";
+            status.style.fontSize = "30px";
+            document.getElementById('latency-chip').innerText =
+                `⚡ Edge: ${latency} ms | ☁️ Cloud: ${cloudLatencyGlobal} ms`;
+
+            if (risk === 'Low') {
+                panel.style.borderColor = 'var(--color-low)';
+                panel.style.boxShadow = 'var(--glow-low)';
+                status.style.color = 'var(--color-low)';
+            } else if (risk === 'High') {
+                panel.style.borderColor = 'var(--color-high)';
+                panel.style.boxShadow = 'var(--glow-high)';
+                status.style.color = 'var(--color-high)';
+            } else {
+                panel.style.borderColor = 'var(--color-alarm)';
+                panel.style.boxShadow = 'var(--glow-alarm)';
+                status.style.color = 'var(--color-alarm)';
+            }
+        }
+    </script>
+</body>
+
+</html>
