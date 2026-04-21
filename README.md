@@ -1,3 +1,70 @@
+
+# 🌊 Flood Prediction Using Edge AI
+
+> A real-time flood risk prediction system that compares **Edge inference** (in-browser via ONNX) against **Cloud inference** (Flask server) — measuring latency, accuracy, and reliability across both paradigms.
+
+---
+
+## 📌 Overview
+
+This project demonstrates the power of **Edge Computing** for disaster prediction. A high-accuracy **CatBoost** model is deployed in two ways simultaneously:
+
+| Mode | Where it runs | Technology |
+|------|--------------|-----------|
+| ⚡ **Edge** | Directly in the browser | ONNX Runtime Web (WebAssembly) |
+| ☁️ **Cloud** | Remote Flask server | Python + joblib |
+
+Both predictions are triggered from the same sensor inputs, and the dashboard displays **live latency comparisons** between the two — illustrating how edge inference eliminates network round-trip delays critical in flood emergency scenarios.
+
+---
+
+## 🎯 Key Features
+
+- **Real-time flood risk classification** — Low / High / Alarming
+- **Dual inference pipeline** — Edge (ONNX in browser) + Cloud (Flask API) running in parallel
+- **Live latency benchmarking** — millisecond-precision comparison between edge and cloud
+- **Firebase logging** — all predictions and latency metrics persisted to Firebase Realtime Database
+- **Interactive sensor dashboard** — 9 environmental sliders trigger instant re-inference
+- **Zero-install edge deployment** — model runs entirely in browser, no app required
+
+---
+
+## 🧠 Model
+
+The prediction model is a **CatBoost classifier** trained on 20 environmental features and outputs one of three flood risk levels.
+
+**Input Features (20 total):**
+
+| Feature | Slider ID | Range |
+|---------|-----------|-------|
+| Monsoon Intensity | `monsoon` | 1–12 |
+| Surface Runoff | `runoff` | 1–12 |
+| River Management | `river` | 1–12 |
+| Dam Pressure | `dam` | 1–12 |
+| Siltation (Turbidity) | `silt` | 1–12 |
+| Drainage Systems | `drain` | 1–12 |
+| Tide / Surge Level | `tide` | 1–12 |
+| Ground Stability | `ground` | 1–12 |
+| Soil Moisture | `soil` | 1–12 |
+| *(11 additional features)* | — | Fixed at 5.0 |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
 # ⚙️ SETUP & EXECUTION GUIDE
 ## Flood Prediction Edge AI System
 
